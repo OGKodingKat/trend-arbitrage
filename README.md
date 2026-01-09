@@ -16,7 +16,7 @@ Trend Arbitrage is a MERN stack web application that detects emerging trends **b
 Create a `.env` file in the `server/` directory with the following:
 ```
 MONGO_URI=mongodb://localhost:27017/trend-arbitrage
-PORT=5000
+PORT=5001
 GITHUB_TOKEN=<your_github_api_token>
 ```
 

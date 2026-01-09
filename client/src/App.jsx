@@ -1,27 +1,30 @@
-import React, {useEffect, useState} from 'react';
-import TrendList from './components/TrendList';
-import {fetchTrends} from './services/api';
+import React, { useEffect, useState } from "react";
 
-export default function App(){
+export default function App() {
   const [trends, setTrends] = useState([]);
-  const [loading, setLoading] = useState(false);
 
-  const load = async ()=>{
-    setLoading(true);
-    try{
-      const r = await fetchTrends();
-      setTrends(r);
-    }catch(e){ console.error(e) }
-    setLoading(false);
-  }
+  const load = async () => {
+    await fetch("http://localhost:5001/api/trends/refresh");
+    const res = await fetch("http://localhost:5001/api/trends");
+    setTrends(await res.json());
+  };
 
-  useEffect(()=>{ load(); },[]);
+  useEffect(() => {
+    load();
+  }, []);
 
   return (
-    <div style={{padding:20,fontFamily:'sans-serif'}}>
-      <h2>Trend Arbitrage — Emerging Trends</h2>
-      <button onClick={load} disabled={loading}>{loading? 'Loading...':'Refresh'}</button>
-      <TrendList items={trends} />
+    <div style={{ padding: 20 }}>
+      <h1>🔮 Emerging Trends</h1>
+      <button onClick={load}>Refresh</button>
+
+      {trends.map(t => (
+        <div key={t._id}>
+          <h3>{t.keyword}</h3>
+          <p>Score: {t.score.toFixed(2)}</p>
+          <p>Sources: {t.sources.join(", ")}</p>
+        </div>
+      ))}
     </div>
-  )
+  );
 }

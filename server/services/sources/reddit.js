@@ -1,27 +1,17 @@
-const axios = require('axios');
-const cheerio = require('cheerio');
+import fetch from "node-fetch";
 
-async function fetchNew(){
-  // Scrape old.reddit.com for new posts in a few tech subreddits
-  const subs = ['technology','programming','MachineLearning'];
-  const items = [];
-  for (let s of subs){
-    try{
-      const url = `https://old.reddit.com/r/${s}/new/`;
-      const res = await axios.get(url, {headers:{'User-Agent':'trend-arb-bot/0.1'}});
-      const $ = cheerio.load(res.data);
-      $('.thing').each((i, el)=>{
-        const title = $(el).find('a.title').text().trim();
-        const link = $(el).find('a.title').attr('href');
-        const time = $(el).find('time').attr('datetime');
-        const score = parseInt($(el).attr('data-score')||0,10);
-        if (title) items.push({title, url: link, source: 'reddit', meta:{subreddit: s, score}, time: time ? new Date(time) : new Date()});
-      });
-    }catch(err){
-      console.warn('reddit fetch failed for', s, err.message);
-    }
-  }
-  return items;
+export async function fetchReddit() {
+  const res = await fetch(
+    "https://www.reddit.com/r/LocalLLaMA/new.json?limit=25",
+    { headers: { "User-Agent": "trend-arb" } }
+  );
+
+  const json = await res.json();
+
+  return json.data.children.map(p => ({
+    keyword: p.data.title,
+    engagement: p.data.ups + p.data.num_comments,
+    createdAt: new Date(p.data.created_utc * 1000),
+    source: "reddit",
+  }));
 }
-
-module.exports = { fetchNew };

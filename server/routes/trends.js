@@ -1,35 +1,67 @@
-const express = require('express');
+ import express from "express";
+import Trend from "../models/Trend.js";
+import { fetchReddit } from "../services/sources/reddit.js";
+import { fetchHackerNews } from "../services/sources/hackernews.js";
+import { fetchGitHub } from "../services/sources/github.js";
+import { calculateRisingScore } from "../services/scoring.js";
+
 const router = express.Router();
-const reddit = require('../services/sources/reddit');
-const hackernews = require('../services/sources/hackernews');
-const rssFeeds = require('../services/sources/rss');
-const scoring = require('../services/scoring');
-const Trend = require('../models/Trend');
 
-router.get('/', async (req, res) => {
+router.get("/refresh", async (req, res) => {
   try {
-    // fetch candidates in parallel
-    const [rItems, hnItems, rssItems] = await Promise.all([
-      reddit.fetchNew(),
-      hackernews.fetchNew(),
-      rssFeeds.fetchFeeds()
-    ]);
+    const items = [
+      ...(await fetchReddit()),
+      ...(await fetchHackerNews()),
+      ...(await fetchGitHub()),
+    ];
 
-    const all = [...rItems, ...hnItems, ...rssItems];
-    const scored = scoring.scoreCandidates(all);
+    const grouped = {};
 
-    // save top results to DB (upsert by title)
-    const results = [];
-    for (let t of scored.slice(0, 50)){
-      const doc = await Trend.findOneAndUpdate({title: t.title}, {...t, updatedAt: new Date()}, {upsert:true, new:true});
-      results.push(doc);
+    items.forEach(item => {
+      if (!item || !item.keyword) return; // ✅ guard
+
+      if (!grouped[item.keyword]) {
+        grouped[item.keyword] = {
+          keyword: item.keyword,
+          engagement: 0,
+          sources: [],
+          createdAt: item.createdAt || new Date(),
+        };
+      }
+
+      grouped[item.keyword].engagement += item.engagement || 0;
+      grouped[item.keyword].sources.push(item.source);
+    });
+
+    await Trend.deleteMany({});
+
+    for (const trend of Object.values(grouped)) {
+      const score = calculateRisingScore(trend);
+
+      await Trend.create({
+        ...trend,
+        score,
+      });
     }
 
-    res.json(results.sort((a,b)=>b.score - a.score));
-  } catch (err){
-    console.error(err);
-    res.status(500).json({error: 'failed to fetch trends'});
+    res.status(200).json({ status: "refreshed" }); // ✅ always respond
+
+  } catch (err) {
+    console.error("🔥 /refresh error:", err);
+    res.status(500).json({
+      error: "Failed to refresh trends",
+      message: err.message,
+    });
   }
 });
 
-module.exports = router;
+router.get("/", async (req, res) => {
+  const trends = await Trend.find()
+    .sort({ score: -1 })
+    .limit(20);
+
+  res.json(trends);
+});
+
+export default router;
+

@@ -1,22 +1,46 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const cors = require('cors');
-const trendsRouter = require('./routes/trends');
-require('dotenv').config();
+// Entry point for the server.
+// - Sets up the Express app.
+// - Connects to MongoDB using the MONGO_URI from the .env file.
+// - Defines API routes for trends.
+
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+import trendsRoute from "./routes/trends.js";
+
+dotenv.config({ path: '.env' }); // Load environment variables from .env file.
 
 const app = express();
-app.use(cors());
+
+app.use(cors({
+  origin: "http://localhost:5173"
+}));
+
+// Middleware to parse JSON requests.
 app.use(express.json());
+// Define routes for the API.
+app.use("/api/trends", trendsRoute);
 
-app.use('/api/trends', trendsRouter);
+const PORT = process.env.PORT || 5001;
+const MONGO_URI = process.env.MONGO_URI;
 
-const PORT = process.env.PORT || 4000;
-const MONGO = process.env.MONGO_URI || 'mongodb://localhost:27017/trend-arbitrage';
+if (!MONGO_URI) {
+  console.error("ERROR: MONGO_URI is not set in .env");
+  process.exit(1);
+}
+// Connect to MongoDB.
+mongoose
+  .connect(MONGO_URI)
+  .then(() => {
+    console.log("✓ MongoDB connected");
 
-mongoose.connect(MONGO, { useNewUrlParser: true, useUnifiedTopology: true }).then(()=>{
-  console.log('Connected to MongoDB');
-  app.listen(PORT, ()=>console.log(`Server listening ${PORT}`));
-}).catch(err=>{
-  console.error('Mongo connection error', err);
-  app.listen(PORT, ()=>console.log(`Server listening ${PORT} (no mongo)`));
-});
+// Start the server.
+    app.listen(PORT, () => {
+      console.log(`✓ Server running on port ${PORT}`);
+    });
+  })
+  .catch(err => {
+    console.error("✗ MongoDB connection failed:", err.message);
+    process.exit(1);
+  });

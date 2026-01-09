@@ -1,24 +1,21 @@
-const axios = require('axios');
+import fetch from "node-fetch";
 
-const HN_BASE = 'https://hacker-news.firebaseio.com/v0';
+export async function fetchHackerNews() {
+  const ids = await fetch(
+    "https://hacker-news.firebaseio.com/v0/newstories.json"
+  ).then(r => r.json());
 
-async function fetchNew(limit=50){
-  try{
-    const idsRes = await axios.get(`${HN_BASE}/newstories.json`);
-    const ids = (idsRes.data||[]).slice(0, limit);
-    const items = await Promise.all(ids.map(async id=>{
-      try{
-        const r = await axios.get(`${HN_BASE}/item/${id}.json`);
-        const d = r.data;
-        if (!d) return null;
-        return {title: d.title, url: d.url || `https://news.ycombinator.com/item?id=${id}`, source:'hackernews', meta:{score: d.score||0, descendants: d.descendants||0}, time: d.time ? new Date(d.time*1000) : new Date() };
-      }catch(e){ return null }
-    }));
-    return items.filter(Boolean);
-  }catch(err){
-    console.warn('HN fetch failed', err.message);
-    return [];
-  }
+  const stories = await Promise.all(
+    ids.slice(0, 20).map(id =>
+      fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`)
+        .then(r => r.json())
+    )
+  );
+
+  return stories.map(s => ({
+    keyword: s.title,
+    engagement: s.score || 0,
+    createdAt: new Date(s.time * 1000),
+    source: "hackernews",
+  }));
 }
-
-module.exports = { fetchNew };
